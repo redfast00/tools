@@ -4,8 +4,8 @@
 #  file of hashes in JtR or hashcat format.
 
 
-import sys
 import re
+import argparse
 
 class Hash():
     pass
@@ -55,29 +55,34 @@ class ManaHash(Hash):
     def format(d):
         raise NotImplementedError
 
-def print_usage():
-    print("Usage:")
-    print("exportlog.py <informat> <infile> <outformat> <outfile>")
+HASH_FORMATS = {
+    'john': JohnHash,
+    'hashcat': HashcatHash,
+    'mana': ManaHash
+}
 
 def remove_colons(hexstr):
+    """Removes colons from a string"""
     return ''.join(hexstr.split(':'))
 
+def parse_args():
+    """Parses command-line arguments"""
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('infile', type=argparse.FileType('r'))
+    parser.add_argument('informat', action='store', choices=HASH_FORMATS)
+    parser.add_argument('outfile', type=argparse.FileType('w'))
+    parser.add_argument('outformat', action='store', choices=HASH_FORMATS)
+
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    if (len(sys.argv) != 5) or (sys.argv[1] not in ['john', 'hashcat', 'mana']) or (sys.argv[3] not in ['john', 'hashcat']):
-        print_usage()
-        quit()
-    import_format = sys.argv[1]
-    export_format = sys.argv[3]
-    with open(sys.argv[2], 'r') as infile, open(sys.argv[4], 'w') as outfile:
-        for line in infile:
-            if import_format == 'john':
-                d = JohnHash.parse(line)
-            elif import_format == 'hashcat':
-                d = HashcatHash.parse(line)
-            elif import_format == 'mana':
-                d = ManaHash.parse(line)
-            if export_format == 'john':
-                outline = JohnHash.format(d)
-            elif export_format == 'hashcat':
-                outline = HashcatHash.format(d)
-            outfile.write(outline + "\n")
+    args = parse_args()
+    input_hash_class = HASH_FORMATS[args.informat]
+    output_hash_class = HASH_FORMATS[args.outformat]
+
+    for line in args.infile:
+        parsed_line = input_hash_class.parse(line)
+        converted_line = output_hash_class.format(parsed_line)
+        args.outfile.write(converted_line + '\n')
